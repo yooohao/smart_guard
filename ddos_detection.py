@@ -1,5 +1,4 @@
 import pandas as pd
-from scipy.io import arff
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -7,83 +6,86 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Load NSL-KDD dataset (ARFF format)
-data_train, meta_train = arff.loadarff('KDDTrain+.arff')
-data_test, meta_test = arff.loadarff('KDDTest+.arff')
+# 1. Load the NSL-KDD dataset (TXT format, supports multi-class classification)
+df_train = pd.read_csv('KDDTrain+.txt', header=None)
+df_test = pd.read_csv('KDDTest+.txt', header=None)
 
-df_train = pd.DataFrame(data_train)
-df_test = pd.DataFrame(data_test)
+# Add column names (NSL-KDD has 43 columns, with the last column as the difficulty level)
+columns = [
+    'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land',
+    'wrong_fragment', 'urgent', 'hot', 'num_failed_logins', 'logged_in', 'num_compromised',
+    'root_shell', 'su_attempted', 'num_root', 'num_file_creations', 'num_shells',
+    'num_access_files', 'num_outbound_cmds', 'is_host_login', 'is_guest_login', 'count',
+    'srv_count', 'serror_rate', 'srv_serror_rate', 'rerror_rate', 'srv_rerror_rate',
+    'same_srv_rate', 'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count',
+    'dst_host_srv_count', 'dst_host_same_srv_rate', 'dst_host_diff_srv_rate',
+    'dst_host_same_src_port_rate', 'dst_host_srv_diff_host_rate', 'dst_host_serror_rate',
+    'dst_host_srv_serror_rate', 'dst_host_rerror_rate', 'dst_host_srv_rerror_rate',
+    'class',  # The 42nd column is the attack type
+    'difficulty'  # The 43rd column is the difficulty level
+]
+df_train.columns = columns
+df_test.columns = columns
 
-# Convert bytes type categorical values to strings
-for col in df_train.select_dtypes(['object']).columns:
-    df_train[col] = df_train[col].str.decode('utf-8')
-    df_test[col] = df_test[col].str.decode('utf-8')
+# Verify the number of columns
+print("Number of columns in training set:", len(df_train.columns))
+print("Number of columns in test set:", len(df_test.columns))
 
-# Convert binary features to integers
+# 2. Preprocess: Convert binary features to integers
 binary_cols = ['land', 'logged_in', 'is_host_login', 'is_guest_login']
 for col in binary_cols:
-    if col in df_train.columns:
-        df_train[col] = df_train[col].astype(int)
-        df_test[col] = df_test[col].astype(int)
+    df_train[col] = df_train[col].astype(int)
+    df_test[col] = df_test[col].astype(int)
 
-# Preprocess 'class' column: strip whitespace and convert to lowercase
+# 3. Preprocess the 'class' column: strip whitespace and convert to lowercase
 df_train['class'] = df_train['class'].str.strip().str.lower()
 df_test['class'] = df_test['class'].str.strip().str.lower()
 
-# Optional: Print all attack types in the training set to check for any unmapped values
-print("Attack types in training set:", df_train['class'].unique())
+# Check original labels
+print("Unique original labels in training set:", df_train['class'].unique())
+print("Unique original labels in test set:", df_test['class'].unique())
+print("Label distribution in training set:\n", df_train['class'].value_counts())
+print("Label distribution in test set:\n", df_test['class'].value_counts())
 
-# Define attack type mapping (ensure all attack types are mapped; default unmapped ones to 'Other')
+# 4. Define attack mapping, focusing on DDoS and MITM
 attack_mapping = {
     'normal': 'Normal',
-    # DDoS-related attacks (DoS category)
+    # DDoS-related attacks
     'neptune': 'DDoS', 'smurf': 'DDoS', 'back': 'DDoS', 'teardrop': 'DDoS', 'pod': 'DDoS', 'land': 'DDoS',
     # MITM-related attacks
-    'spy': 'MITM', 'multihop': 'MITM', 'phf': 'MITM',
-    # Other attack types mapped to Other
-    'ipsweep': 'Other', 'nmap': 'Other', 'portsweep': 'Other', 'satan': 'Other',
-    'ftp_write': 'Other', 'guess_passwd': 'Other', 'imap': 'Other', 'warezclient': 'Other', 
-    'warezmaster': 'Other', 'buffer_overflow': 'Other', 'loadmodule': 'Other', 'perl': 'Other', 'rootkit': 'Other'
+    'spy': 'MITM', 'multihop': 'MITM', 'phf': 'MITM'
 }
-
-# Map attack types using the defined mapping; default to 'Other' if not found
 df_train['attack_type'] = df_train['class'].map(lambda x: attack_mapping.get(x, 'Other'))
 df_test['attack_type'] = df_test['class'].map(lambda x: attack_mapping.get(x, 'Other'))
 
-# Check for unmapped attack types (the count should be 0)
-assert df_train['attack_type'].isnull().sum() == 0, "There are unmapped attack types in the training set"
-assert df_test['attack_type'].isnull().sum() == 0, "There are unmapped attack types in the test set"
+# Check mapping results
+print("\nMapped label distribution in training set:\n", df_train['attack_type'].value_counts())
+print("Mapped label distribution in test set:\n", df_test['attack_type'].value_counts())
 
-# Split features and labels
-X_train = df_train.drop(['class', 'attack_type'], axis=1)
+# 5. Split features and labels (exclude the 'difficulty' column)
+X_train = df_train.drop(['class', 'attack_type', 'difficulty'], axis=1)
 y_train = df_train['attack_type']
-X_test = df_test.drop(['class', 'attack_type'], axis=1)
+X_test = df_test.drop(['class', 'attack_type', 'difficulty'], axis=1)
 y_test = df_test['attack_type']
 
-# Data preprocessing: One-hot encode categorical features
+# 6. Data Preprocessing
+# One-hot encode categorical features
 cat_cols = X_train.select_dtypes(include='object').columns.tolist()
 ohe = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-if cat_cols:
-    X_train_cat = ohe.fit_transform(X_train[cat_cols])
-    X_test_cat = ohe.transform(X_test[cat_cols])
-else:
-    X_train_cat = np.array([[]])
-    X_test_cat = np.array([[]])
+X_train_cat = ohe.fit_transform(X_train[cat_cols])
+X_test_cat = ohe.transform(X_test[cat_cols])
 
-# Data preprocessing: Standardize numerical features
+# Standardize numerical features
 num_cols = X_train.select_dtypes(exclude='object').columns
 scaler = StandardScaler()
 X_train_num = scaler.fit_transform(X_train[num_cols])
 X_test_num = scaler.transform(X_test[num_cols])
 
-# Combine preprocessed features
-if X_train_cat.size > 0:
-    X_train_processed = np.hstack([X_train_num, X_train_cat])
-    X_test_processed = np.hstack([X_test_num, X_test_cat])
-else:
-    X_train_processed = X_train_num
-    X_test_processed = X_test_num
+# Combine the preprocessed features
+X_train_processed = np.hstack([X_train_num, X_train_cat])
+X_test_processed = np.hstack([X_test_num, X_test_cat])
 
+# 7. Train models
 # Train Decision Tree model
 dt_model = DecisionTreeClassifier(random_state=42)
 dt_model.fit(X_train_processed, y_train)
@@ -94,7 +96,7 @@ rf_model = RandomForestClassifier(random_state=42)
 rf_model.fit(X_train_processed, y_train)
 y_pred_rf = rf_model.predict(X_test_processed)
 
-# Calculate performance metrics
+# 8. Calculate performance metrics
 acc_dt = accuracy_score(y_test, y_pred_dt)
 prec_dt = precision_score(y_test, y_pred_dt, average='weighted')
 rec_dt = recall_score(y_test, y_pred_dt, average='weighted')
@@ -105,31 +107,39 @@ prec_rf = precision_score(y_test, y_pred_rf, average='weighted')
 rec_rf = recall_score(y_test, y_pred_rf, average='weighted')
 f1_rf = f1_score(y_test, y_pred_rf, average='weighted')
 
-# Print performance metrics
-print("=== Performance Metrics Comparison ===")
+# Output overall performance metrics
+print("\n=== Performance Comparison ===")
 print(f"Decision Tree -> Accuracy: {acc_dt:.4f}, Precision: {prec_dt:.4f}, Recall: {rec_dt:.4f}, F1: {f1_dt:.4f}")
 print(f"Random Forest -> Accuracy: {acc_rf:.4f}, Precision: {prec_rf:.4f}, Recall: {rec_rf:.4f}, F1: {f1_rf:.4f}")
 
-# Print detailed classification reports
+# Output detailed classification reports
 print("\n=== Classification Report: Decision Tree ===")
 print(classification_report(y_test, y_pred_dt))
-
-print("=== Classification Report: Random Forest ===")
+print("\n=== Classification Report: Random Forest ===")
 print(classification_report(y_test, y_pred_rf))
 
-# Visualize performance metrics
-metrics = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
-dt_scores = [acc_dt, prec_dt, rec_dt, f1_dt]
-rf_scores = [acc_rf, prec_rf, rec_rf, f1_rf]
+# 9. Visualize performance metrics by class
+metrics = ['Precision', 'Recall', 'F1-Score']
+dt_report = classification_report(y_test, y_pred_dt, output_dict=True)
+rf_report = classification_report(y_test, y_pred_rf, output_dict=True)
+
+# Define labels (ensure these match your mapping: Normal, DDoS, MITM, Other)
+labels = ['Normal', 'DDoS', 'MITM', 'Other']
+dt_scores = [[dt_report[label][m.lower()] for m in metrics] for label in labels if label in dt_report]
+rf_scores = [[rf_report[label][m.lower()] for m in metrics] for label in labels if label in rf_report]
 
 x = np.arange(len(metrics))
-width = 0.35
-plt.figure(figsize=(8, 6))
-plt.bar(x - width/2, dt_scores, width, label='Decision Tree')
-plt.bar(x + width/2, rf_scores, width, label='Random Forest')
-plt.xticks(x, metrics)
+width = 0.15
+plt.figure(figsize=(12, 6))
+for i, label in enumerate(labels):
+    if label in dt_report:
+        plt.bar(x + i * width, dt_scores[i], width, label=f'DT {label}')
+    if label in rf_report:
+        plt.bar(x + i * width + len(labels) * width, rf_scores[i], width, label=f'RF {label}')
+plt.xticks(x + width * len(labels) / 2, metrics)
 plt.ylabel('Score')
-plt.title('Model Performance on NSL-KDD (Multi-Class: Normal, DDoS, MITM, Other)')
+plt.title('Model Performance by Class (NSL-KDD)')
 plt.ylim(0, 1.0)
-plt.legend()
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
 plt.show()
