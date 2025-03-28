@@ -1,0 +1,54 @@
+======================================================================
+                SmartGuard: AI-Driven Security for Smart Homes         
+                  DDoS Attack Detection - Summary Report           
+======================================================================
+
+DATASET INFORMATION
+------------------
+Total Samples: 238687
+Training Samples: 179015
+Testing Samples: 59672
+Attack Samples (%): 95.73%
+
+MODEL PERFORMANCE
+----------------
+
+Logistic Regression:
+  Accuracy: 0.9938
+  Inference Time (s): 0.0074
+  Precision: 0.9962
+  Recall: 0.9974
+  F1 Score: 0.9968
+  AUC: 0.9940
+
+Random Forest:
+  Accuracy: 0.9997
+  Inference Time (s): 0.1732
+  Precision: 0.9998
+  Recall: 0.9999
+  F1 Score: 0.9999
+  AUC: 1.0000
+
+Svm:
+  Accuracy: 0.9994
+  Inference Time (s): 5.6895
+  Precision: 0.9997
+  Recall: 0.9997
+  F1 Score: 0.9997
+  AUC: 0.9998
+
+Decision Tree:
+  Accuracy: 0.9997
+  Inference Time (s): 0.0034
+  Precision: 0.9998
+  Recall: 0.9998
+  F1 Score: 0.9998
+  AUC: 0.9980
+
+CONCLUSION
+----------
+Based on F1 score, the Random Forest model performed better for DDoS attack detection.
+This model achieved an accuracy of 0.9997 and an F1 score of 0.9999.
+
+The results demonstrate the effectiveness of machine learning techniques for detecting DDoS attacks in smart home networks.
+This approach could be integrated into smart home security systems to provide real-time protection against network-based threats.
