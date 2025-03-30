@@ -21,23 +21,33 @@ def create_directory(directory_path):
         os.makedirs(directory_path)
         print(f"Created directory: {directory_path}")
 
-def load_model(model_path):
-    """
-    Load a trained model from disk.
+# def load_model(model_path):
+#     """
+#     Load a trained model from disk.
     
-    Parameters:
-    -----------
-    model_path : str
-        Path to the saved model
+#     Parameters:
+#     -----------
+#     model_path : str
+#         Path to the saved model
         
-    Returns:
-    --------
-    object
-        Loaded model
-    """
+#     Returns:
+#     --------
+#     object
+#         Loaded model
+#     """
+#     try:
+#         with open(model_path, 'rb') as f:
+#             model = pickle.load(f)
+#         print(f"Model loaded from {model_path}")
+#         return model
+#     except Exception as e:
+#         print(f"Error loading model from {model_path}: {e}")
+#         return None
+
+def load_model(model_path):
     try:
-        with open(model_path, 'rb') as f:
-            model = pickle.load(f)
+        import joblib
+        model = joblib.load(model_path)  # 使用joblib加载
         print(f"Model loaded from {model_path}")
         return model
     except Exception as e:
@@ -132,7 +142,7 @@ def simulate_multi_attack_traffic(n_samples=5000):
     # Set seed for reproducibility
     np.random.seed(42)
     
-    # Define attack types and their proportions
+    # Define attack types and their proportions(设定每种的攻击比例)
     attack_types = {
         'BENIGN': 0.35,
         'DDoS': 0.25,
@@ -344,6 +354,110 @@ def simulate_multi_attack_traffic(n_samples=5000):
     return combined_df.sample(frac=1).reset_index(drop=True)
 
 def live_detection_demo(model, scaler, feature_names=None, n_samples=100, multi_class=False):
+    print(f"\nRunning live detection demo with {n_samples} simulated network flows...")
+    
+    # 生成模拟流量
+    if multi_class:
+        data = simulate_multi_attack_traffic(n_samples=n_samples)
+        y_true_col = 'attack_type'
+        
+        # 创建标签到数字的映射（这是新增的）
+        attack_labels = np.unique(data[y_true_col])
+        attack_to_num = {label: idx for idx, label in enumerate(attack_labels)}
+        # 将字符串标签转换为数字
+        data['attack_type_num'] = data[y_true_col].map(attack_to_num)
+        y_true_col_num = 'attack_type_num'
+    else:
+        data = simulate_ddos_traffic(n_samples=n_samples, attack_ratio=0.3)
+        y_true_col = 'is_ddos'
+        y_true_col_num = y_true_col  # 二分类已经是数字标签
+    
+    print(f"Generated {len(data)} simulated network flows")
+    
+    # 提取特征和标签
+    if feature_names is not None:
+        # 确保所有需要的特征都存在
+        missing_features = [f for f in feature_names if f not in data.columns]
+        if missing_features:
+            print(f"Warning: {len(missing_features)} features expected by the model are missing in simulated data.")
+            # 添加缺失特征，值为0
+            for feature in missing_features:
+                data[feature] = 0
+        
+        X = data[feature_names]
+    else:
+        # 排除所有标签列
+        exclude_cols = [y_true_col, y_true_col_num] if multi_class else [y_true_col]
+        X = data.drop(exclude_cols, axis=1)
+    
+    y_true = data[y_true_col_num]  # 使用数字标签
+    
+    # 如果提供了scaler，缩放特征
+    if scaler is not None:
+        X_scaled = scaler.transform(X)
+    else:
+        X_scaled = X.values
+    
+    # 进行预测
+    start_time = time.time()
+    y_pred = model.predict(X_scaled)
+    
+    # 获取预测概率（如果可用）
+    if hasattr(model, 'predict_proba'):
+        y_proba = model.predict_proba(X_scaled)
+        if not multi_class:
+            # 对于二分类，获取正类的概率
+            y_proba = y_proba[:, 1]
+    else:
+        y_proba = y_pred
+    
+    inference_time = time.time() - start_time
+    
+    # 将预测添加到数据中
+    results = data.copy()
+    results['predicted_attack'] = y_pred
+    
+    if multi_class:
+        # 对于多类分类，获取数字预测对应的类名
+        num_to_attack = {idx: label for label, idx in attack_to_num.items()}
+        results['predicted_attack_name'] = results['predicted_attack'].map(num_to_attack)
+        
+        # 计算是否正确分类
+        results['correctly_classified'] = (results[y_true_col_num] == results['predicted_attack'])
+        
+        # 预测概率 - 存储最高概率
+        if hasattr(model, 'predict_proba'):
+            results['attack_probability'] = y_proba.max(axis=1)
+    else:
+        # 对于二分类
+        results['attack_probability'] = y_proba
+        results['correctly_classified'] = (y_true == y_pred)
+    
+    # 计算指标
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average='weighted')
+    recall = recall_score(y_true, y_pred, average='weighted')
+    f1 = f1_score(y_true, y_pred, average='weighted')
+    
+    print(f"\nLive Detection Results:")
+    print(f"Processed {n_samples} network flows in {inference_time:.4f} seconds")
+    print(f"Detection rate: {inference_time / n_samples:.6f} seconds per flow")
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1 Score: {f1:.4f}")
+    
+    # 混淆矩阵
+    from sklearn.metrics import confusion_matrix
+    cm = confusion_matrix(y_true, y_pred)
+    print("\nConfusion Matrix:")
+    print(cm)
+    
+    return results
+
+# def live_detection_demo(model, scaler, feature_names=None, n_samples=100, multi_class=False):
     """
     Run a live detection demo using simulated network traffic.
     

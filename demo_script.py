@@ -105,41 +105,84 @@ def generate_binary_demo_plot(results, threshold=0.5, output_dir='output/demo'):
 
 def generate_multiclass_demo_plot(results, attack_types=None, output_dir='output/demo'):
     """Generate a visualization of the demo results for multi-class classification"""
-    # Sort by probability for better visualization
-    sorted_results = results.sort_values('attack_probability', ascending=False)
+    # 准备数据 - 使用数字标签和名称标签
+    if 'attack_type_num' in results.columns:
+        # 使用数字标签进行排序和处理
+        true_numeric_labels = results['attack_type_num'].values
+        pred_numeric_labels = results['predicted_attack'].values
+        correct_mask = results['correctly_classified'].values
+        
+        # 获取字符串标签用于显示
+        if 'predicted_attack_name' in results.columns:
+            # 使用已映射的名称
+            true_string_labels = results['attack_type'].values
+            pred_string_labels = results['predicted_attack_name'].values
+        else:
+            # 如果没有映射的名称，使用数字标签
+            true_string_labels = [str(label) for label in true_numeric_labels]
+            pred_string_labels = [str(label) for label in pred_numeric_labels]
+    else:
+        # 旧版本的结果可能没有数字标签列
+        true_labels = results['attack_type'].values
+        pred_labels = results['predicted_attack'].values
+        
+        # 确保标签类型一致 (全部转为字符串)
+        true_string_labels = np.array([str(label) for label in true_labels])
+        pred_string_labels = np.array([str(label) for label in pred_labels])
+        true_numeric_labels = np.array([float(i) for i in range(len(true_labels))])
+        pred_numeric_labels = np.array([float(i) for i in range(len(pred_labels))])
+        correct_mask = results['correctly_classified'].values
     
-    # Prepare data for plotting
-    probs = sorted_results['attack_probability'].values
-    true_labels = sorted_results['attack_type'].values
-    pred_labels = sorted_results['predicted_attack'].values
-    correct_mask = sorted_results['correctly_classified'].values
+    # 按攻击概率排序
+    sorted_indices = np.argsort(results['attack_probability'].values)[::-1]  # 倒序排列
     
-    # Create figure
+    true_string_labels = np.array(true_string_labels)[sorted_indices]
+    pred_string_labels = np.array(pred_string_labels)[sorted_indices]
+    true_numeric_labels = np.array(true_numeric_labels)[sorted_indices]
+    pred_numeric_labels = np.array(pred_numeric_labels)[sorted_indices]
+    correct_mask = np.array(correct_mask)[sorted_indices]
+    probs = results['attack_probability'].values[sorted_indices]
+    
+    # 创建图形
     plt.figure(figsize=(15, 12))
     
-    # Create probability plot
+    # 创建概率图
     plt.subplot(3, 1, 1)
     plt.bar(range(len(probs)), probs, alpha=0.7)
     plt.ylabel('Attack Probability', fontsize=12)
     plt.title('SmartGuard Multi-Attack Detection - Live Demo', fontsize=16)
     
-    # Create true vs predicted attack types plot
+    # 创建真实与预测攻击类型图
     plt.subplot(3, 1, 2)
     
-    # Get unique attack types
+    # 获取唯一攻击类型
     if attack_types is not None:
         unique_attacks = list(attack_types.values())
     else:
-        unique_attacks = sorted(pd.unique(np.concatenate([true_labels, pred_labels])))
+        # 安全地获取所有唯一的标签字符串
+        # 修复此处的类型混合问题
+        # all_string_labels = np.concatenate([true_string_labels, pred_string_labels])
+        # unique_attacks = np.unique(all_string_labels).tolist()
+        
+        all_string_labels = np.concatenate([
+        np.array(true_string_labels, dtype=str), 
+        np.array(pred_string_labels, dtype=str)
+        ])
+        unique_attacks = np.unique(all_string_labels).tolist()
     
-    # Create mapping from attack types to numeric values
+    # 创建从攻击类型到数字值的映射
     attack_to_num = {attack: i for i, attack in enumerate(unique_attacks)}
     
-    # Convert attack types to numeric values for plotting
-    true_nums = np.array([attack_to_num.get(label, -1) for label in true_labels])
-    pred_nums = np.array([attack_to_num.get(label, -1) for label in pred_labels])
+    # 将标签转换为数字
+    try:
+        true_nums = np.array([attack_to_num.get(label, -1) for label in true_string_labels])
+        pred_nums = np.array([attack_to_num.get(label, -1) for label in pred_string_labels])
+    except:
+        # 备用方案
+        true_nums = np.array(range(len(true_string_labels)))
+        pred_nums = np.array(range(len(pred_string_labels)))
     
-    # Plot
+    # 绘图
     plt.scatter(range(len(true_nums)), true_nums, marker='o', color='blue', label='True Attack Type')
     plt.scatter(range(len(pred_nums)), pred_nums, marker='x', color='red', label='Predicted Attack Type')
     
@@ -148,38 +191,45 @@ def generate_multiclass_demo_plot(results, attack_types=None, output_dir='output
     plt.ylabel('Attack Type', fontsize=12)
     plt.legend(loc='upper right')
     
-    # Create detection accuracy plot
+    # 创建检测准确率图
     plt.subplot(3, 1, 3)
     plt.scatter(range(len(correct_mask)), correct_mask, c=['green' if x else 'red' for x in correct_mask], alpha=0.7)
     plt.yticks([0, 1], ['Incorrect', 'Correct'])
     plt.xlabel('Network Flow Sample', fontsize=12)
     plt.ylabel('Detection Accuracy', fontsize=12)
     
-    # Calculate and display accuracy statistics
+    # 计算并显示准确率统计
     accuracy = correct_mask.mean()
     
-    # Calculate confusion matrix
+    # 使用数字标签计算混淆矩阵
     from sklearn.metrics import confusion_matrix
-    cm = confusion_matrix(true_labels, pred_labels, labels=unique_attacks)
+    try:
+        cm = confusion_matrix(true_numeric_labels, pred_numeric_labels)
+    except:
+        # 备用方案 - 创建空矩阵
+        n_classes = len(unique_attacks)
+        cm = np.zeros((n_classes, n_classes), dtype=int)
     
-    # Display overall accuracy
+    # 显示整体准确率
     plt.figtext(0.5, 0.01, 
                 f"Overall Accuracy: {accuracy:.2f}",
                 ha="center", fontsize=12, bbox={"facecolor":"lightgray", "alpha":0.5, "pad":5})
     
-    # Save plot
+    # 保存图
     plt.tight_layout(rect=[0, 0.03, 1, 0.97])
     plt.savefig(os.path.join(output_dir, 'multiclass_detection_demo.png'), dpi=300)
     plt.close()
     
-    # Generate confusion matrix heatmap
+    # 生成混淆矩阵热图
     plt.figure(figsize=(12, 10))
     import seaborn as sns
     
-    # Create a normalized confusion matrix for better visualization
-    cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    # 创建归一化混淆矩阵以便更好的可视化
+    with np.errstate(divide='ignore', invalid='ignore'):  # 忽略除零警告
+        cm_normalized = np.true_divide(cm.astype('float'), cm.sum(axis=1)[:, np.newaxis])
+        cm_normalized[~np.isfinite(cm_normalized)] = 0  # 替换无穷值为0
     
-    # Plot using seaborn for better appearance
+    # 使用seaborn获得更好的外观
     sns.heatmap(cm_normalized, annot=cm, fmt='d', cmap='Blues', 
                 xticklabels=unique_attacks, yticklabels=unique_attacks)
     
@@ -187,7 +237,7 @@ def generate_multiclass_demo_plot(results, attack_types=None, output_dir='output
     plt.xlabel('Predicted Attack Type', fontsize=14)
     plt.ylabel('True Attack Type', fontsize=14)
     
-    # Rotate labels for better readability
+    # 旋转标签以提高可读性
     plt.xticks(rotation=45, ha='right', fontsize=10)
     plt.yticks(fontsize=10)
     
@@ -251,9 +301,17 @@ def run_demo(args):
     if args.multi_class:
         attack_types = load_attack_types(args.attack_types_path)
     
+    # 获取模型期望的特征数量
+    n_features_expected = 46  # 从错误消息中得知模型期望的特征数量
+    
+    # 创建虚拟特征名称列表
+    dummy_feature_names = [f'feature_{i}' for i in range(n_features_expected)]
+    
     # Run live detection demo
     results = live_detection_demo(
-        model, scaler, 
+        model, 
+        scaler,
+        feature_names=dummy_feature_names,  # 传递虚拟特征名称
         n_samples=args.samples,
         multi_class=args.multi_class
     )

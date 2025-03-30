@@ -7,7 +7,6 @@ import numpy as np
 import sys
 import threading
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -56,13 +55,6 @@ class ModelTrainer:
                 random_state=42
             )
             
-            # SVM
-            models['svm'] = SVC(
-                probability=True,
-                decision_function_shape='ovo',  # one-vs-one for multi-class
-                random_state=42
-            )
-            
             # Decision Tree
             models['decision_tree'] = DecisionTreeClassifier(
                 random_state=42
@@ -77,12 +69,6 @@ class ModelTrainer:
             # Random Forest
             models['random_forest'] = RandomForestClassifier(
                 n_estimators=100,
-                random_state=42
-            )
-            
-            # SVM
-            models['svm'] = SVC(
-                probability=True,
                 random_state=42
             )
             
@@ -188,10 +174,6 @@ class ModelTrainer:
                 'max_depth': [None, 10, 20],
                 'min_samples_split': [2, 5, 10]
             },
-            'svm': {
-                'C': [0.1, 1.0, 10.0],
-                'kernel': ['linear', 'rbf']
-            },
             'decision_tree': {
                 'max_depth': [None, 10, 20, 30],
                 'min_samples_split': [2, 5, 10],
@@ -230,21 +212,10 @@ class ModelTrainer:
             
             try:
                 # Perform grid search
-                if name == 'svm' and len(X_train) > 10000:
-                    # Use a subset of data for SVM tuning
-                    subset_size = min(10000, len(X_train))
-                    indices = np.random.choice(len(X_train), subset_size, replace=False)
-                    X_subset, y_subset = X_train[indices], y_train[indices]
-                    
-                    grid_search = GridSearchCV(
-                        model, param_grids[name], cv=3, n_jobs=-1, verbose=1
-                    )
-                    grid_search.fit(X_subset, y_subset)
-                else:
-                    grid_search = GridSearchCV(
-                        model, param_grids[name], cv=3, n_jobs=-1, verbose=1
-                    )
-                    grid_search.fit(X_train, y_train)
+                grid_search = GridSearchCV(
+                    model, param_grids[name], cv=3, n_jobs=-1, verbose=1
+                )
+                grid_search.fit(X_train, y_train)
             finally:
                 # Ensure we always stop the timer
                 stop_timer.set()
