@@ -196,20 +196,39 @@ class DataProcessor:
             Dataset
         label_column : str
             Name of the label column
-            
+                
         Returns:
         --------
         DataFrame
             Dataset with binary labels
         """
-        # Check if DDoS is already in the label column
+        # 添加调试信息
+        print(f"Checking for DDoS in labels. First 10 unique values: {data[label_column].unique()[:10]}")
+        
+        # 检查数据类型
         if data[label_column].dtype == 'object':
-            if 'ddos' in data[label_column].str.lower().values or 'DDoS' in data[label_column].values:
-                print("DDoS label found in dataset")
-                data['is_ddos'] = data[label_column].str.lower().str.contains('ddos').astype(int)
+            # 手动检查"DDoS"字符串
+            has_ddos = False
+            for value in data[label_column].unique():
+                if isinstance(value, str) and "DDoS" in value:
+                    has_ddos = True
+                    break
+                    
+            if has_ddos:
+                print("DDoS label found in dataset using manual check")
+                # 直接检查以"DDoS-"开头的标签
+                data['is_ddos'] = data[label_column].apply(lambda x: 1 if isinstance(x, str) and x.startswith('DDoS-') else 0)
+                ddos_count = data['is_ddos'].sum()
+                print(f"Automatically detected {ddos_count} samples as DDoS attacks")
+                if ddos_count > 0:
+                    print(f"DDoS attack types found: {data[data['is_ddos'] == 1][label_column].unique().tolist()}")
             else:
                 print("Warning: 'DDoS' not found in labels. Please check your dataset.")
-                # You might need to manually specify what attack types to consider as DDoS
+                # 仍然保留手动输入选项作为备选方案
+                print("Available unique labels:")
+                unique_labels = data[label_column].unique()
+                # 打印前20个标签或全部标签（如果不足20个）
+                print(unique_labels[:min(20, len(unique_labels))])
                 ddos_types = input("Enter comma-separated attack types to consider as DDoS: ").split(',')
                 data['is_ddos'] = data[label_column].isin(ddos_types).astype(int)
         else:
@@ -249,7 +268,7 @@ class DataProcessor:
         response = input()
         
         if response.lower() == 'y':
-            # For example, map all DDoS variants to 'DDoS'
+            # map all DDoS variants to 'DDoS'
             print("Enter mapping in format 'Category:type1,type2,...' (one line per category):")
             print("Examples:")
             print("DDoS:DDoS-RSTFINFlood,DDoS-ICMP_Flood,DDoS-TCP_Flood")
