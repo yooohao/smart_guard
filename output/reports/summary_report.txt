@@ -15,7 +15,7 @@ MODEL PERFORMANCE
 
 Logistic Regression:
   Accuracy: 0.9938
-  Inference Time (s): 0.0074
+  Inference Time (s): 0.0130
   Precision: 0.9962
   Recall: 0.9974
   F1 Score: 0.9968
@@ -23,7 +23,7 @@ Logistic Regression:
 
 Random Forest:
   Accuracy: 0.9997
-  Inference Time (s): 0.1732
+  Inference Time (s): 0.1864
   Precision: 0.9998
   Recall: 0.9999
   F1 Score: 0.9999
@@ -31,7 +31,7 @@ Random Forest:
 
 Svm:
   Accuracy: 0.9994
-  Inference Time (s): 5.6895
+  Inference Time (s): 6.1087
   Precision: 0.9997
   Recall: 0.9997
   F1 Score: 0.9997
@@ -39,7 +39,7 @@ Svm:
 
 Decision Tree:
   Accuracy: 0.9997
-  Inference Time (s): 0.0034
+  Inference Time (s): 0.0028
   Precision: 0.9998
   Recall: 0.9998
   F1 Score: 0.9998
