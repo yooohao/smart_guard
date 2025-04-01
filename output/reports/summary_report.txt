@@ -1,46 +1,88 @@
 ======================================================================
                 SmartGuard: AI-Driven Security for Smart Homes         
-                  DDoS Attack Detection - Summary Report           
+              Multi-Class Attack Detection - Summary Report         
 ======================================================================
 
 DATASET INFORMATION
 ------------------
-Total Samples: 238687
-Training Samples: 179015
+Total Samples: 238686
+Training Samples: 179014
 Testing Samples: 59672
-Attack Samples (%): 72.80%
+
+ATTACK DISTRIBUTION
+------------------
+Backdoor_Malware: 22
+BenignTraffic: 5600
+BrowserHijacking: 30
+CommandInjection: 28
+DDoS-ACK_Fragmentation: 1505
+DDoS-HTTP_Flood: 169
+DDoS-ICMP_Flood: 36553
+DDoS-ICMP_Fragmentation: 2377
+DDoS-PSHACK_Flood: 21210
+DDoS-RSTFINFlood: 20669
+DDoS-SYN_Flood: 20739
+DDoS-SlowLoris: 106
+DDoS-SynonymousIP_Flood: 18189
+DDoS-TCP_Flood: 23149
+DDoS-UDP_Flood: 27626
+DDoS-UDP_Fragmentation: 1484
+DNS_Spoofing: 925
+DictionaryBruteForce: 63
+DoS-HTTP_Flood: 414
+DoS-SYN_Flood: 10275
+DoS-TCP_Flood: 13630
+DoS-UDP_Flood: 16957
+MITM-ArpSpoofing: 1614
+Mirai-greeth_flood: 5016
+Mirai-greip_flood: 3758
+Mirai-udpplain: 4661
+Recon-HostDiscovery: 697
+Recon-OSScan: 517
+Recon-PingSweep: 6
+Recon-PortScan: 430
+SqlInjection: 31
+Uploading_Attack: 8
+VulnerabilityScan: 210
+XSS: 18
 
 MODEL PERFORMANCE
 ----------------
 
 Logistic Regression:
-  Accuracy: 0.8481
-  Inference Time (s): 0.0022
-  Precision: 0.8343
-  Recall: 0.9874
-  F1 Score: 0.9044
-  AUC: 0.9294
+  Accuracy: 0.8179
+  Inference Time (s): 0.0455
+  Precision (Macro): 0.6120
+  Recall (Macro): 0.5014
+  F1 Score (Macro): 0.5134
+  Precision (Weighted): 0.8323
+  Recall (Weighted): 0.8179
+  F1 Score (Weighted): 0.7902
 
 Random Forest:
-  Accuracy: 0.9994
-  Inference Time (s): 0.2634
-  Precision: 0.9995
-  Recall: 0.9996
-  F1 Score: 0.9996
-  AUC: 1.0000
+  Accuracy: 0.9903
+  Inference Time (s): 0.6133
+  Precision (Macro): 0.7319
+  Recall (Macro): 0.6889
+  F1 Score (Macro): 0.6943
+  Precision (Weighted): 0.9897
+  Recall (Weighted): 0.9903
+  F1 Score (Weighted): 0.9895
 
 Decision Tree:
-  Accuracy: 0.9995
-  Inference Time (s): 0.0033
-  Precision: 0.9997
-  Recall: 0.9996
-  F1 Score: 0.9997
-  AUC: 0.9995
+  Accuracy: 0.9913
+  Inference Time (s): 0.0070
+  Precision (Macro): 0.7977
+  Recall (Macro): 0.8077
+  F1 Score (Macro): 0.7992
+  Precision (Weighted): 0.9914
+  Recall (Weighted): 0.9913
+  F1 Score (Weighted): 0.9914
 
 CONCLUSION
 ----------
-Based on F1 score, the Decision Tree model performed better for DDoS attack detection.
-This model achieved an accuracy of 0.9995 and an F1 score of 0.9997.
+Based on F1 score (macro), the Decision Tree model performed better for attack classification.
+This model achieved an accuracy of 0.9913 and a macro F1 score of 0.7992.
 
-The results demonstrate the effectiveness of machine learning techniques for detecting DDoS attacks in smart home networks.
-This approach could be integrated into smart home security systems to provide real-time protection against network-based threats.
+The results demonstrate the effectiveness of machine learning techniques for classifying different types of network attacks in smart home environments.
+This approach could be integrated into smart home security systems to provide comprehensive protection against a variety of network-based threats.

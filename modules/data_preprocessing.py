@@ -9,9 +9,9 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 class DataProcessor:
     """
-    Class for loading and preprocessing network traffic data for attack detection
+    Class for loading and preprocessing network traffic data for attack detection.
     """
-    
+
     def __init__(self, data_path):
         """
         Initialize the data processor.
@@ -19,14 +19,14 @@ class DataProcessor:
         Parameters:
         -----------
         data_path : str
-            Path to the dataset CSV file
+            Path to the dataset CSV file.
         """
         self.data_path = data_path
         self.scaler = StandardScaler()
         self.label_encoder = LabelEncoder()
         self.feature_names = None
         self.attack_types = None
-    
+
     def process_data(self, test_size=0.25, multi_class=False):
         """
         Load and preprocess the network traffic dataset.
@@ -34,14 +34,14 @@ class DataProcessor:
         Parameters:
         -----------
         test_size : float
-            Proportion of data to use for testing
+            Proportion of data to use for testing.
         multi_class : bool
-            Whether to perform multi-class classification instead of binary
+            Whether to perform multi-class classification instead of binary.
             
         Returns:
         --------
-        X_train, X_test, y_train, y_test, feature_names
-            Preprocessed training and testing data
+        X_train_scaled, X_test_scaled, y_train, y_test, feature_names
+            Preprocessed training and testing data.
         """
         print(f"Loading dataset from {self.data_path}...")
         
@@ -56,7 +56,6 @@ class DataProcessor:
             
             # Process data
             processed_data = self._process_dataset(data, multi_class)
-            
             if processed_data is None:
                 raise ValueError("Data processing failed.")
             
@@ -73,7 +72,6 @@ class DataProcessor:
                 print("\nAttack Types:")
                 for idx, attack_type in self.attack_types.items():
                     print(f"{idx}: {attack_type}")
-                
             else:
                 # For binary classification (DDoS or not)
                 X = processed_data.drop(['is_ddos'], axis=1)
@@ -99,7 +97,7 @@ class DataProcessor:
         except Exception as e:
             print(f"Error loading or preprocessing data: {e}")
             raise
-    
+
     def _process_dataset(self, data, multi_class=False):
         """
         Process the dataset for attack detection.
@@ -107,18 +105,17 @@ class DataProcessor:
         Parameters:
         -----------
         data : DataFrame
-            Raw dataset
+            Raw dataset.
         multi_class : bool
-            Whether to perform multi-class classification
+            Whether to perform multi-class classification.
             
         Returns:
         --------
         DataFrame
-            Processed dataset
+            Processed dataset.
         """
-        # Identify the label column (adjust as needed based on your dataset)
+        # Identify the label column
         label_column = self._identify_label_column(data)
-        
         if label_column is None:
             print("Could not identify label column. Please check your dataset.")
             return None
@@ -126,6 +123,13 @@ class DataProcessor:
         if multi_class:
             # For multi-class classification, categorize attacks
             data = self._categorize_attacks(data, label_column)
+            
+            # 过滤掉样本数量不足 2 的类别
+            class_counts = data['attack_type'].value_counts()
+            low_count_classes = class_counts[class_counts < 2].index.tolist()
+            if low_count_classes:
+                print(f"Removing classes with too few samples: {low_count_classes}")
+                data = data[~data['attack_type'].isin(low_count_classes)]
         else:
             # For binary classification, create binary labels
             data = self._create_binary_labels(data, label_column)
@@ -145,7 +149,7 @@ class DataProcessor:
         # Handle missing values
         data = self._handle_missing_values(data, numeric_features)
         
-        # One-hot encode categorical features
+        # One-hot encode categorical features (if any)
         if categorical_features:
             data = pd.get_dummies(data, columns=categorical_features)
             print(f"Data shape after one-hot encoding: {data.shape}")
@@ -157,7 +161,7 @@ class DataProcessor:
             data = data.drop(label_column, axis=1)
         
         return data
-    
+
     def _identify_label_column(self, data):
         """
         Identify the label column in the dataset.
@@ -165,12 +169,11 @@ class DataProcessor:
         Parameters:
         -----------
         data : DataFrame
-            Dataset
             
         Returns:
         --------
         str or None
-            Name of the label column
+            Name of the label column.
         """
         label_column = None
         for col in ['Label', 'label', 'Attack', 'attack', 'class', 'Class']:
@@ -185,7 +188,7 @@ class DataProcessor:
             label_column = input("Please enter the name of the label column: ")
         
         return label_column
-    
+
     def _create_binary_labels(self, data, label_column):
         """
         Create binary labels for DDoS detection.
@@ -193,21 +196,18 @@ class DataProcessor:
         Parameters:
         -----------
         data : DataFrame
-            Dataset
+            Dataset.
         label_column : str
-            Name of the label column
+            Name of the label column.
                 
         Returns:
         --------
         DataFrame
-            Dataset with binary labels
+            Dataset with binary labels.
         """
-        # 添加调试信息
         print(f"Checking for DDoS in labels. First 10 unique values: {data[label_column].unique()[:10]}")
         
-        # 检查数据类型
         if data[label_column].dtype == 'object':
-            # 手动检查"DDoS"字符串
             has_ddos = False
             for value in data[label_column].unique():
                 if isinstance(value, str) and "DDoS" in value:
@@ -216,7 +216,6 @@ class DataProcessor:
                     
             if has_ddos:
                 print("DDoS label found in dataset using manual check")
-                # 直接检查以"DDoS-"开头的标签
                 data['is_ddos'] = data[label_column].apply(lambda x: 1 if isinstance(x, str) and x.startswith('DDoS-') else 0)
                 ddos_count = data['is_ddos'].sum()
                 print(f"Automatically detected {ddos_count} samples as DDoS attacks")
@@ -224,20 +223,17 @@ class DataProcessor:
                     print(f"DDoS attack types found: {data[data['is_ddos'] == 1][label_column].unique().tolist()}")
             else:
                 print("Warning: 'DDoS' not found in labels. Please check your dataset.")
-                # 仍然保留手动输入选项作为备选方案
                 print("Available unique labels:")
                 unique_labels = data[label_column].unique()
-                # 打印前20个标签或全部标签（如果不足20个）
                 print(unique_labels[:min(20, len(unique_labels))])
                 ddos_types = input("Enter comma-separated attack types to consider as DDoS: ").split(',')
                 data['is_ddos'] = data[label_column].isin(ddos_types).astype(int)
         else:
-            # If the label is already binary, just copy it
             print("Label column appears to be numeric. Assuming binary classification.")
             data['is_ddos'] = data[label_column]
         
         return data
-    
+
     def _categorize_attacks(self, data, label_column):
         """
         Categorize different types of attacks for multi-class classification.
@@ -245,30 +241,28 @@ class DataProcessor:
         Parameters:
         -----------
         data : DataFrame
-            Dataset
+            Dataset.
         label_column : str
-            Name of the label column
+            Name of the label column.
             
         Returns:
         --------
         DataFrame
-            Dataset with categorized attack types
+            Dataset with categorized attack types.
         """
         # Display unique attack types in dataset
         unique_attacks = data[label_column].unique()
         print(f"\nFound {len(unique_attacks)} unique attack labels:")
-        for i, attack in enumerate(unique_attacks):
-            print(f"{i+1}. {attack}")
+        for i, attack in enumerate(unique_attacks, 1):
+            print(f"{i}. {attack}")
         
         # Create a simplified attack_type column
         data['attack_type'] = data[label_column]
         
-        # Optionally map attack types to higher-level categories
         print("\nDo you want to map attack types to higher-level categories? (y/n)")
         response = input()
         
         if response.lower() == 'y':
-            # map all DDoS variants to 'DDoS'
             print("Enter mapping in format 'Category:type1,type2,...' (one line per category):")
             print("Examples:")
             print("DDoS:DDoS-RSTFINFlood,DDoS-ICMP_Flood,DDoS-TCP_Flood")
@@ -281,7 +275,6 @@ class DataProcessor:
                 line = input()
                 if line.lower() == 'done':
                     break
-                
                 try:
                     category, types = line.split(':')
                     attack_types = [t.strip() for t in types.split(',')]
@@ -290,86 +283,48 @@ class DataProcessor:
                 except ValueError:
                     print("Invalid format. Please use 'Category:type1,type2,...'")
             
-            # Apply mapping
             data['attack_type'] = data['attack_type'].map(mapping).fillna(data['attack_type'])
-            
             print("\nAttack types after mapping:")
             print(data['attack_type'].value_counts())
         
         return data
-    
+
     def _identify_features(self, data, label_column):
         """
         Identify numeric and categorical features in the dataset.
         
         Parameters:
         -----------
-        data : DataFrame
-            Dataset
+        data : DataFrame.
         label_column : str
-            Name of the label column
-            
+        
         Returns:
         --------
-        tuple
-            Lists of numeric and categorical features
+        tuple: (numeric_features, categorical_features)
         """
-        # Select relevant features for attack detection
-        exclude_cols = ['is_ddos', 'attack_type', label_column]
-        
-        numeric_features = [
-            col for col in data.columns if data[col].dtype in ['int64', 'float64'] 
-            and col not in exclude_cols
-        ]
-        
-        categorical_features = [
-            col for col in data.columns if data[col].dtype == 'object' 
-            and col not in exclude_cols
-        ]
-        
-        print(f"\nSelected {len(numeric_features)} numeric features and {len(categorical_features)} categorical features")
-        
+        # 这里假设所有非标签列都是数值型特征
+        numeric_features = [col for col in data.columns if col != label_column and data[col].dtype in [np.int64, np.float64]]
+        categorical_features = []  # 如果需要处理类别特征，可在此扩展
         return numeric_features, categorical_features
-    
+
     def _handle_missing_values(self, data, numeric_features):
         """
-        Handle missing values in the dataset.
-        
-        Parameters:
-        -----------
-        data : DataFrame
-            Dataset
-        numeric_features : list
-            List of numeric features
-            
-        Returns:
-        --------
-        DataFrame
-            Dataset with missing values handled
+        Handle missing values in numeric features.
         """
-        # Check for missing values
-        missing_values = data[numeric_features].isnull().sum().sum()
-        
-        if missing_values > 0:
-            print(f"Found {missing_values} missing values in numeric features")
-            
-            # Fill missing values with median
-            for feature in numeric_features:
-                data[feature].fillna(data[feature].median(), inplace=True)
-                
-            print("Filled missing values with median")
-        else:
-            print("No missing values found in numeric features")
-        
+        # 这里简单采用均值填充缺失值
+        for col in numeric_features:
+            if data[col].isnull().sum() > 0:
+                data[col].fillna(data[col].mean(), inplace=True)
         return data
-    
+
     def get_attack_types(self):
         """
-        Get mapping of encoded labels to attack types.
-        
-        Returns:
-        --------
-        dict
-            Mapping of encoded labels to attack types
+        Return the mapping dictionary of attack types (only for multi-class mode).
         """
         return self.attack_types
+
+if __name__ == "__main__":
+    # 示例：如何使用 DataProcessor
+    dp = DataProcessor("data/CIC-IoT 2023/cic_subset.csv")
+    X_train, X_test, y_train, y_test, features = dp.process_data(test_size=0.25, multi_class=True)
+    print("预处理完成")
